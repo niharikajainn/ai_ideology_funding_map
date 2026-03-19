@@ -106,6 +106,25 @@
       max-height: calc(100vh - 70px);
       overflow-y: auto;
     }
+    #legend-toggle {
+      position: absolute;
+      top: 50px;
+      right: 10px;
+      background: rgba(10, 15, 30, 0.94);
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 11px;
+      color: #94a3b8;
+      cursor: pointer;
+      z-index: 11;
+      user-select: none;
+      display: none;
+    }
+    #legend-toggle:hover { color: #e2e8f0; }
+    #legend.collapsed {
+      display: none;
+    }
     .leg-section { margin-bottom: 10px; }
     .leg-section:last-child { margin-bottom: 0; }
     .leg-title {
@@ -125,6 +144,11 @@
       border: 1.5px solid rgba(255,255,255,0.15);
     }
     .leg-line { width: 22px; height: 12px; margin-right: 8px; flex-shrink: 0; }
+
+    @media (max-width: 768px) {
+      #header.dismissed { opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+    }
+    #header { transition: opacity 0.4s ease; }
 
     #instructions {
       position: absolute;
@@ -159,7 +183,12 @@
 
 <div id="container">
   <div id="tooltip"></div>
+  <div id="legend-toggle">Key ▸</div>
   <div id="legend">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <span style="font-size:9px; text-transform:uppercase; letter-spacing:0.08em; color:#475569; font-weight:700;">Key</span>
+      <span id="legend-collapse" style="font-size:10px; color:#475569; cursor:pointer; user-select:none; padding:1px 4px;" title="Collapse">✕</span>
+    </div>
     <div class="leg-section">
       <div class="leg-title">Node Type <span style="font-weight:400;font-size:8px;color:#475569">(click to highlight)</span></div>
       <div class="leg-item" data-category="billionaire"><div class="leg-dot" style="background:#fcd34d"></div>Billionaire</div>
@@ -1134,6 +1163,33 @@ function hideTooltip() { tip.style.display = "none"; }
 
 // ─── Background click clears selection ────────────────────────────────────────
 svg.on("click", () => clearSelection());
+
+// ─── Dismiss title on small screens when user starts interacting ──────────────
+const header = document.getElementById("header");
+const smallScreen = window.matchMedia("(max-width: 768px)");
+
+function dismissTitle() {
+  if (smallScreen.matches) header.classList.add("dismissed");
+}
+
+svg.on("mousedown.titleDismiss touchstart.titleDismiss", () => {
+  dismissTitle();
+  svg.on("mousedown.titleDismiss touchstart.titleDismiss", null);
+});
+
+// ─── Legend collapse / expand ─────────────────────────────────────────────────
+const legend       = document.getElementById("legend");
+const legendToggle = document.getElementById("legend-toggle");
+const legendCollapse = document.getElementById("legend-collapse");
+
+legendCollapse.addEventListener("click", () => {
+  legend.classList.add("collapsed");
+  legendToggle.style.display = "block";
+});
+legendToggle.addEventListener("click", () => {
+  legend.classList.remove("collapsed");
+  legendToggle.style.display = "none";
+});
 
 // ─── Default highlight on load ────────────────────────────────────────────────
 activeNodeSet = new Set(["o_openphil", "o_abundance2025", "o_doge", "o_miri", "o_ifp"]);
