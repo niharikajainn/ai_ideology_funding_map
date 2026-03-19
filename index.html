@@ -1179,6 +1179,11 @@ const legend       = document.getElementById("legend");
 const legendToggle = document.getElementById("legend-toggle");
 const legendCollapse = document.getElementById("legend-collapse");
 
+if (window.innerWidth <= 768) {
+  legend.classList.add("collapsed");
+  legendToggle.style.display = "block";
+}
+
 legendCollapse.addEventListener("click", () => {
   legend.classList.add("collapsed");
   legendToggle.style.display = "block";
