@@ -663,6 +663,7 @@ const links = [
   { source: "o_stand_together",  target: "o_abundance2025",   type: "funded",         label: "Stand Together Trust (Koch network) sponsored the Abundance Conferences" },
   { source: "o_stand_together",  target: "o_niskanen",        type: "funded",         label: "Stand Together Trust (Koch network) funds the Niskanen Center" },
   { source: "p_koch",            target: "o_fai",             type: "funded",         label: "Charles Koch funds the Foundation for American Innovation" },
+  { source: "p_koch",            target: "o_aei",             type: "funded",         label: "Charles Koch and Koch-affiliated foundations are major funders of the American Enterprise Institute" },
   { source: "p_koch",            target: "o_emergent_ventures", type: "funded",       label: "Charles Koch funds Emergent Ventures through his philanthropic network" },
 
   // Google
@@ -1188,7 +1189,7 @@ legendToggle.addEventListener("click", () => {
 });
 
 // ─── Default highlight on load ────────────────────────────────────────────────
-activeNodeSet = new Set(["o_openphil", "o_abundance2025", "o_doge", "o_miri", "o_ifp"]);
+activeNodeSet = new Set(["o_openphil", "o_abundance2025", "o_doge", "o_miri", "o_ifp", "o_aei"]);
 applyHighlight();
 
 // ─── Legend category filter clicks ────────────────────────────────────────────
