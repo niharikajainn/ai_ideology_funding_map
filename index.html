@@ -161,9 +161,9 @@
   <div id="tooltip"></div>
   <div id="legend">
     <div class="leg-section">
-      <div class="leg-title">Node Type <span style="font-weight:400;font-size:8px;color:#475569">(click to filter)</span></div>
+      <div class="leg-title">Node Type <span style="font-weight:400;font-size:8px;color:#475569">(click to highlight)</span></div>
       <div class="leg-item" data-category="billionaire"><div class="leg-dot" style="background:#fcd34d"></div>Billionaire</div>
-      <div class="leg-item" data-category="journalist"><div class="leg-dot" style="background:#818cf8"></div>Journalist</div>
+      <div class="leg-item" data-category="journalist"><div class="leg-dot" style="background:#818cf8"></div>News</div>
       <div class="leg-item" data-category="philosopher"><div class="leg-dot" style="background:#c084fc"></div>Philosopher</div>
       <div class="leg-item" data-category="think_tank"><div class="leg-dot" style="background:#4ade80"></div>Think Tank</div>
       <div class="leg-item" data-category="charity"><div class="leg-dot" style="background:#f87171"></div>Charity</div>
@@ -427,6 +427,16 @@ const nodes = [
     detail: "AI lab founded by Demis Hassabis, Shane Legg, and Mustafa Suleyman (2010). Early funding from Peter Thiel's Founders Fund and Horizons Ventures (Li Ka-shing) before Google acquired it for ~£400M (~$650M) in 2014. Co-founder Shane Legg expressed long-standing AI risk concerns predating EA. Has an internal AI safety team. Connected to broader AI safety discourse through personnel; several MIRI/FHI-adjacent researchers have worked there. Thiel's early investment links the same rationalist-adjacent funder who seeded MIRI to the mainstream AI lab ecosystem."
   },
   {
+    id: "o_atlantic", label: "The Atlantic", type: "org", cluster: "media", category: "journalist",
+    tag: "Media Organization",
+    detail: "American magazine founded in 1857. Derek Thompson is a staff writer covering economics, technology, and culture — including his foundational Abundance Agenda work. Tyler Cowen has contributed pieces on economics and progress. The Atlantic has become a key venue for Abundance-adjacent ideas, publishing influential essays on housing, innovation, and American decline."
+  },
+  {
+    id: "o_nyt", label: "New York Times", type: "org", cluster: "media", category: "journalist",
+    tag: "Media Organization",
+    detail: "America's newspaper of record. Ezra Klein joined as a columnist and podcast host in 2021 after co-founding Vox. His NYT platform amplified the Abundance Agenda to a mass audience, most directly through the co-authorship of 'Abundance' (2025) with Derek Thompson and his influential podcast interviews with key figures across the EA, AI safety, and Abundance communities."
+  },
+  {
     id: "o_vox", label: "Vox / Future Perfect", type: "org", cluster: "ea", category: "journalist",
     tag: "Media Organization",
     detail: "Vox founded by Ezra Klein (2014). Future Perfect is its EA-adjacent section covering longtermism, AI safety, animal welfare, and evidence-based giving. Kelsey Piper is the key writer. Serves as the main mainstream media bridge to the EA/longtermist community. The existence of Future Perfect within Vox reflects Klein's dual engagement with Abundance Agenda and EA-adjacent ideas."
@@ -565,6 +575,9 @@ const links = [
   { source: "p_karnofsky",  target: "o_openphil",  type: "founded_funded", label: "Co-founded Open Philanthropy with Dustin Moskovitz and Cari Tuna; served as CEO until 2022. Previously co-founded GiveWell (2007), one of EA's foundational charity evaluators." },
   { source: "p_sbf",        target: "o_ftx",       type: "founded_funded", label: "Founded and bankrolled FTX crypto exchange; FTX Future Fund was the EA/longtermist funding vehicle through which SBF deployed hundreds of millions before the collapse" },
   { source: "p_klein",      target: "o_vox",       type: "founded",   label: "Co-founded Vox (2014)" },
+  { source: "p_klein",      target: "o_nyt",       type: "works_at",  label: "NYT columnist and podcast host since 2021; used the platform to amplify the Abundance Agenda and interview key figures across EA, AI safety, and tech policy" },
+  { source: "p_thompson",   target: "o_atlantic",  type: "works_at",  label: "Staff writer at The Atlantic covering economics, technology, and culture; wrote foundational Abundance Agenda pieces including 'How America Became a Country That Can't Build Things'" },
+  { source: "p_cowen",      target: "o_atlantic",  type: "associated", label: "Has contributed pieces on economics, progress, and innovation to The Atlantic" },
 
   // People → Organizations (funding)
   { source: "p_thiel",      target: "o_miri",      type: "funded",    label: "Provided ~$1.7M in early funding to Singularity Institute / MIRI — catalytic for AI safety field. See: 'How Peter Thiel's Relationship With Eliezer Yudkowsky Launched the AI Revolution'" },
@@ -731,14 +744,21 @@ function applyHighlight() {
     linkEl.classed("dimmed", d => !connectedLinks.has(d));
     linkEl.filter(d => connectedLinks.has(d)).attr("stroke-opacity", 0.9);
   } else if (activeCategory !== null) {
-    nodeEl.classed("dimmed", d => d.category !== activeCategory);
-    linkEl.classed("dimmed", d => {
-      const sid = d.source.id ?? d.source;
-      const tid = d.target.id ?? d.target;
-      const sNode = nodes.find(n => n.id === sid);
-      const tNode = nodes.find(n => n.id === tid);
-      return sNode?.category !== activeCategory && tNode?.category !== activeCategory;
+    const categoryNodeIds = new Set(nodes.filter(n => n.category === activeCategory).map(n => n.id));
+    const highlightedNodeIds = new Set(categoryNodeIds);
+    const highlightedLinks = new Set();
+    links.forEach(l => {
+      const sid = l.source.id ?? l.source;
+      const tid = l.target.id ?? l.target;
+      if (categoryNodeIds.has(sid) || categoryNodeIds.has(tid)) {
+        highlightedNodeIds.add(sid);
+        highlightedNodeIds.add(tid);
+        highlightedLinks.add(l);
+      }
     });
+    nodeEl.classed("dimmed", d => !highlightedNodeIds.has(d.id));
+    linkEl.classed("dimmed", d => !highlightedLinks.has(d));
+    linkEl.filter(d => highlightedLinks.has(d)).attr("stroke-opacity", 0.9);
   }
 }
 
