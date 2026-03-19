@@ -192,11 +192,10 @@
       <div class="leg-item" data-category="billionaire"><div class="leg-dot" style="background:#fcd34d"></div>Billionaire</div>
       <div class="leg-item" data-category="journalist"><div class="leg-dot" style="background:#818cf8"></div>News</div>
       <div class="leg-item" data-category="philosopher"><div class="leg-dot" style="background:#c084fc"></div>Philosopher / Pundit</div>
-      <div class="leg-item" data-category="think_tank"><div class="leg-dot" style="background:#4ade80"></div>Think Tank</div>
+      <div class="leg-item" data-category="think_tank"><div class="leg-dot" style="background:#4ade80"></div>Policy</div>
       <div class="leg-item" data-category="charity"><div class="leg-dot" style="background:#f87171"></div>Charity</div>
       <div class="leg-item" data-category="vc_firm"><div class="leg-dot" style="background:#fb923c"></div>VC Firm</div>
       <div class="leg-item" data-category="research_center"><div class="leg-dot" style="background:#22d3ee"></div>Research Center</div>
-      <div class="leg-item" data-category="government"><div class="leg-dot" style="background:#a8a29e"></div>Government</div>
       <div class="leg-item" data-category="event"><div class="leg-dot" style="background:#e879f9"></div>Event</div>
       <div class="leg-item" data-category="tech_company"><div class="leg-dot" style="background:#f97316"></div>Tech Company</div>
     </div>
@@ -250,7 +249,7 @@ const clusterDef = {
   abundance:     { fx: 0.86, fy: 0.26 },
   media:         { fx: 0.67, fy: 0.74 },
   policy:        { fx: 0.90, fy: 0.40 },
-  corporate:     { fx: 0.18, fy: 1.05 },
+  corporate:     { fx: 0.14, fy: 0.82 },
 };
 const cp = {};
 for (const [k, v] of Object.entries(clusterDef)) {
@@ -281,7 +280,6 @@ const categoryColor = {
   charity:          "#f87171",
   vc_firm:          "#fb923c",
   research_center:  "#22d3ee",
-  government:       "#a8a29e",
   event:            "#e879f9",
   tech_company:     "#f97316",
 };
@@ -559,7 +557,7 @@ const nodes = [
     detail: "Philanthropic organization focused on accelerating scientific progress, supporting emerging technologies, and funding policy-oriented research. Funded by Eric Schmidt. Sponsored the Abundance Conferences, placing it at the nexus of tech-philanthropist money and the Abundance Agenda's institutional ecosystem."
   },
   {
-    id: "o_doge", label: "White House", type: "org", cluster: "policy", category: "government",
+    id: "o_doge", label: "White House", type: "org", cluster: "policy", category: "think_tank",
     tag: "Executive Branch / AI & Tech Policy",
     detail: "The Trump White House (2025–) has pursued an aggressive 'AI first' governing strategy. DOGE (Department of Government Efficiency), led by Elon Musk, deploys AI to audit spending, automate government functions, and justify federal workforce reductions. Dean Ball's America's AI Action Plan serves as a policy blueprint: emphasizing speed, deregulation, and U.S. AI leadership over safety guardrails. The administration's approach reflects the Abundance Agenda's anti-bureaucracy instincts taken to an extreme — using AI to dismantle the administrative state rather than just reduce regulatory bottlenecks. Critics warn this concentrates power in private hands with no congressional oversight."
   },
@@ -861,13 +859,16 @@ const linkStyleMap = {
 // Initialize node positions near cluster center
 nodes.forEach(n => {
   const c = cp[n.cluster] || { x: W/2, y: H/2 };
-  const scatter = n.cluster === "corporate" ? 30 : 120;
+  const scatter = n.cluster === "corporate" ? 10 : 120;
   n.x = c.x + (Math.random() - 0.5) * scatter;
   n.y = c.y + (Math.random() - 0.5) * scatter;
 });
 
 const simulation = d3.forceSimulation(nodes)
   .force("link", d3.forceLink(links).id(d => d.id).distance(d => {
+    const sid = d.source.id ?? d.source;
+    const tid = d.target.id ?? d.target;
+    if (sid === "o_microsoft" || tid === "o_microsoft") return 40;
     if (d.type === "funded") return 120;
     if (d.type === "founded") return 95;
     if (d.type === "ideological_influence") return 130;
@@ -875,8 +876,8 @@ const simulation = d3.forceSimulation(nodes)
     return 100;
   }).strength(0.3))
   .force("charge", d3.forceManyBody().strength(-550))
-  .force("x", d3.forceX(d => cp[d.cluster].x).strength(0.18))
-  .force("y", d3.forceY(d => cp[d.cluster].y).strength(0.18))
+  .force("x", d3.forceX(d => cp[d.cluster].x).strength(d => d.cluster === "corporate" ? 0.5 : 0.18))
+  .force("y", d3.forceY(d => cp[d.cluster].y).strength(d => d.cluster === "corporate" ? 0.5 : 0.18))
   .force("collide", d3.forceCollide(d => nodeR(d) + 38))
   .alphaDecay(0.02);
 
