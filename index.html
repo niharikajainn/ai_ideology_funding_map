@@ -146,9 +146,8 @@
     .leg-line { width: 22px; height: 12px; margin-right: 8px; flex-shrink: 0; }
 
     @media (max-width: 768px) {
-      #header.dismissed { opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+      #header { display: none; }
     }
-    #header { transition: opacity 0.4s ease; }
 
     #instructions {
       position: absolute;
@@ -178,7 +177,6 @@
 
 <div id="header">
   <h1>Effective Altruism Rebranded: Abundance is the new ideology of the tech elite &mdash; and they&rsquo;re finally influencing policy</h1>
-  <p>Hover nodes/links for details &middot; Scroll to zoom &middot; Drag to pan</p>
 </div>
 
 <div id="container">
@@ -1163,19 +1161,6 @@ function hideTooltip() { tip.style.display = "none"; }
 
 // ─── Background click clears selection ────────────────────────────────────────
 svg.on("click", () => clearSelection());
-
-// ─── Dismiss title on small screens when user starts interacting ──────────────
-const header = document.getElementById("header");
-const smallScreen = window.matchMedia("(max-width: 768px)");
-
-function dismissTitle() {
-  if (smallScreen.matches) header.classList.add("dismissed");
-}
-
-svg.on("mousedown.titleDismiss touchstart.titleDismiss", () => {
-  dismissTitle();
-  svg.on("mousedown.titleDismiss touchstart.titleDismiss", null);
-});
 
 // ─── Legend collapse / expand ─────────────────────────────────────────────────
 const legend       = document.getElementById("legend");
