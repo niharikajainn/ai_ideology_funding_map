@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EA Meets Abundance</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0a0f1e;
+      color: #e2e8f0;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+    #header {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      text-align: center;
+      padding: 10px 220px;
+      background: linear-gradient(to bottom, rgba(10,15,30,0.95), transparent);
+      z-index: 10;
+      pointer-events: none;
+    }
+    #header h1 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #f1f5f9;
+      letter-spacing: 0.03em;
+    }
+    #header p {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 3px;
+    }
+    #container { width: 100%; height: 100vh; }
+    svg { width: 100%; height: 100%; }
+
+    /* Links */
+    .link { fill: none; }
+    .link-label {
+      font-size: 9px;
+      fill: #64748b;
+      pointer-events: none;
+    }
+
+    /* Nodes */
+    .node { cursor: pointer; }
+    .node-bg { filter: blur(8px); opacity: 0.25; }
+    .node-circle {
+      stroke-width: 1.5;
+      transition: opacity 0.15s;
+    }
+    .node:hover .node-circle { opacity: 0.75; }
+    .node-label {
+      font-size: 10px;
+      fill: #e2e8f0;
+      pointer-events: none;
+      dominant-baseline: middle;
+    }
+    .node-label.movement { font-size: 12px; font-weight: 700; fill: #fff; }
+    .node-label.person { font-size: 10px; }
+    .node-label.org { font-size: 9px; fill: #cbd5e1; }
+
+    /* Tooltip */
+    #tooltip {
+      position: absolute;
+      background: rgba(10, 15, 30, 0.97);
+      border: 1px solid #1e3a5f;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 12px;
+      max-width: 300px;
+      pointer-events: none;
+      display: none;
+      z-index: 100;
+      line-height: 1.6;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    }
+    #tooltip h3 { font-size: 13px; color: #f1f5f9; margin-bottom: 4px; }
+    #tooltip .tag {
+      display: inline-block;
+      background: #1e293b;
+      border-radius: 4px;
+      padding: 1px 7px;
+      font-size: 10px;
+      color: #94a3b8;
+      margin-bottom: 7px;
+    }
+    #tooltip p { color: #94a3b8; font-size: 11px; }
+
+    /* Legend */
+    #legend {
+      position: absolute;
+      top: 50px;
+      right: 10px;
+      background: rgba(10, 15, 30, 0.94);
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 12px 14px;
+      width: 200px;
+      font-size: 11px;
+      z-index: 10;
+      max-height: calc(100vh - 70px);
+      overflow-y: auto;
+    }
+    .leg-section { margin-bottom: 10px; }
+    .leg-section:last-child { margin-bottom: 0; }
+    .leg-title {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #475569;
+      margin-bottom: 5px;
+      font-weight: 700;
+    }
+    .leg-item { display: flex; align-items: center; margin: 3px 0; color: #94a3b8; }
+    .leg-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+      flex-shrink: 0;
+      border: 1.5px solid rgba(255,255,255,0.15);
+    }
+    .leg-line { width: 22px; height: 12px; margin-right: 8px; flex-shrink: 0; }
+
+    #instructions {
+      position: absolute;
+      bottom: 8px;
+      left: 10px;
+      font-size: 10px;
+      color: #334155;
+    }
+
+    /* Clickable legend items */
+    .leg-item[data-category] {
+      cursor: pointer;
+      border-radius: 4px;
+      padding: 2px 5px;
+      margin: 1px -5px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .leg-item[data-category]:hover { color: #e2e8f0; }
+    .leg-item.leg-active { color: #fff; background: rgba(255,255,255,0.1); font-weight: 600; }
+
+    /* Dimmed state for nodes/links during selection */
+    .node.dimmed { opacity: 0.08; pointer-events: none; }
+    .link.dimmed { opacity: 0.04; pointer-events: none; }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <h1>Effective Altruism Rebranded: Abundance is the new ideology of the tech elite &mdash; and they&rsquo;re finally influencing policy</h1>
+  <p>Hover nodes/links for details &middot; Scroll to zoom &middot; Drag to pan</p>
+</div>
+
+<div id="container">
+  <div id="tooltip"></div>
+  <div id="legend">
+    <div class="leg-section">
+      <div class="leg-title">Node Type <span style="font-weight:400;font-size:8px;color:#475569">(click to filter)</span></div>
+      <div class="leg-item" data-category="billionaire"><div class="leg-dot" style="background:#fcd34d"></div>Billionaire</div>
+      <div class="leg-item" data-category="journalist"><div class="leg-dot" style="background:#818cf8"></div>Journalist</div>
+      <div class="leg-item" data-category="philosopher"><div class="leg-dot" style="background:#c084fc"></div>Philosopher</div>
+      <div class="leg-item" data-category="think_tank"><div class="leg-dot" style="background:#4ade80"></div>Think Tank</div>
+      <div class="leg-item" data-category="charity"><div class="leg-dot" style="background:#f87171"></div>Charity</div>
+      <div class="leg-item" data-category="vc_firm"><div class="leg-dot" style="background:#fb923c"></div>VC Firm</div>
+      <div class="leg-item" data-category="research_center"><div class="leg-dot" style="background:#22d3ee"></div>Research Center</div>
+      <div class="leg-item" data-category="government"><div class="leg-dot" style="background:#a8a29e"></div>Government</div>
+      <div class="leg-item" data-category="event"><div class="leg-dot" style="background:#e879f9"></div>Event</div>
+      <div class="leg-item" data-category="tech_company"><div class="leg-dot" style="background:#f97316"></div>Tech Corporation</div>
+    </div>
+    <div class="leg-section">
+      <div class="leg-title">Link Type</div>
+      <div class="leg-item">
+        <svg class="leg-line"><line x1="0" y1="6" x2="22" y2="6" stroke="#10b981" stroke-width="2"/></svg>Founded / Created
+      </div>
+      <div class="leg-item">
+        <svg class="leg-line"><line x1="0" y1="6" x2="22" y2="6" stroke="#f97316" stroke-width="3"/></svg>Funded
+      </div>
+      <div class="leg-item">
+        <svg class="leg-line"><line x1="0" y1="6" x2="22" y2="6" stroke="#f59e0b" stroke-width="2.5"/></svg>Founded &amp; Funded
+      </div>
+      <div class="leg-item">
+        <svg class="leg-line"><line x1="0" y1="6" x2="22" y2="6" stroke="#7c3aed" stroke-width="2" stroke-dasharray="7,3"/></svg>Movement Flow (circles)
+      </div>
+      <div class="leg-item">
+        <svg class="leg-line"><line x1="0" y1="6" x2="22" y2="6" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="5,2"/></svg>Ideological Influence
+      </div>
+      <div class="leg-item">
+        <svg class="leg-line"><line x1="0" y1="6" x2="22" y2="6" stroke="#475569" stroke-width="1" stroke-dasharray="3,2"/></svg>Associated / Member
+      </div>
+      <div class="leg-item">
+        <svg class="leg-line"><line x1="0" y1="6" x2="22" y2="6" stroke="#60a5fa" stroke-width="1.5"/></svg>Works At
+      </div>
+      <div class="leg-item">
+        <svg class="leg-line"><line x1="0" y1="6" x2="22" y2="6" stroke="#f472b6" stroke-width="1.5"/></svg>Personal Relationship
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="instructions">Scroll to zoom &middot; Drag canvas to pan &middot; Drag nodes to reposition</div>
+
+<script>
+const W = window.innerWidth;
+const H = window.innerHeight;
+
+// ─── Cluster centers (fraction of W/H) ───────────────────────────────────────
+const clusterDef = {
+  transhumanism: { fx: 0.06, fy: 0.46 },
+  rationalism:   { fx: 0.19, fy: 0.35 },
+  ea:            { fx: 0.34, fy: 0.24 },
+  longtermism:   { fx: 0.50, fy: 0.16 },
+  aisafety:      { fx: 0.32, fy: 0.68 },
+  funding:       { fx: 0.67, fy: 0.38 },
+  progress:      { fx: 0.69, fy: 0.18 },
+  founders:      { fx: 0.69, fy: 0.32 },
+  ea_abund:      { fx: 0.57, fy: 0.34 },
+  abundance:     { fx: 0.86, fy: 0.26 },
+  media:         { fx: 0.67, fy: 0.74 },
+  policy:        { fx: 0.90, fy: 0.40 },
+  corporate:     { fx: 0.18, fy: 1.05 },
+};
+const cp = {};
+for (const [k, v] of Object.entries(clusterDef)) {
+  cp[k] = { x: v.fx * W, y: v.fy * H };
+}
+
+// ─── Color map (cluster = ideology circle outlines only) ─────────────────────
+const clusterColor = {
+  transhumanism: "#7c3aed",
+  rationalism:   "#2563eb",
+  ea:            "#059669",
+  longtermism:   "#0891b2",
+  aisafety:      "#6366f1",
+  funding:       "#dc2626",
+  progress:      "#f97316",
+  founders:      "#dc2626",
+  abundance:     "#d97706",
+  media:         "#db2777",
+  policy:        "#65a30d",
+};
+
+// ─── Category colors (node fill/stroke) ──────────────────────────────────────
+const categoryColor = {
+  billionaire:      "#fcd34d",
+  journalist:       "#818cf8",
+  philosopher:      "#c084fc",
+  think_tank:       "#4ade80",
+  charity:          "#f87171",
+  vc_firm:          "#fb923c",
+  research_center:  "#22d3ee",
+  government:       "#a8a29e",
+  event:            "#e879f9",
+  tech_company:     "#f97316",
+};
+
+function nodeR(d) {
+  return 13;
+}
+
+// ─── Nodes ────────────────────────────────────────────────────────────────────
+const nodes = [
+  // PEOPLE
+  {
+    id: "p_bostrom", label: "Nick Bostrom", type: "person", cluster: "longtermism", category: "philosopher",
+    tag: "Philosopher / Oxford",
+    detail: "Swedish-British philosopher at Oxford. Co-founded World Transhumanist Association with David Pearce (1998). Founded Future of Humanity Institute (FHI) at Oxford (2005). Author of Superintelligence (2014), which mainstreamed AI existential risk thinking. Pioneer of both transhumanism and longtermism. The TESCREAL Bundle article critiques him as a central node in a problematic ideological cluster. FHI closed in 2024."
+  },
+  {
+    id: "p_yudkowsky", label: "Eliezer Yudkowsky", type: "person", cluster: "rationalism", category: "philosopher",
+    tag: "AI Safety Researcher / Rationalism Founder",
+    detail: "Self-taught AI safety researcher. Founded Singularity Institute for Artificial Intelligence (2000), later renamed MIRI (2013). Created LessWrong blog — the hub of the rationalist community. Received crucial early funding (~$1.7M) from Peter Thiel. Per 'How Peter Thiel's Relationship With Eliezer Yudkowsky Launched the AI Revolution,' this funding bootstrapped modern AI safety discourse. Known for deep pessimism about AI alignment prospects."
+  },
+  {
+    id: "p_tallinn", label: "Jaan Tallinn", type: "person", cluster: "ea", category: "billionaire",
+    tag: "Skype Co-founder / EA Funder",
+    detail: "Estonian tech entrepreneur (Skype co-founder). Major EA and longtermist funder and co-founder of institutions. Co-founded Future of Life Institute (2014) and Centre for Study of Existential Risk at Cambridge (2012). Significant personal donor to AI safety research. Coordinates with Open Philanthropy on AI safety funding priorities. Gave a $110M personal loan to FTX, which was repaid before the exchange collapsed in Nov 2022."
+  },
+  {
+    id: "p_thiel", label: "Peter Thiel", type: "person", cluster: "rationalism", category: "billionaire",
+    tag: "PayPal Co-founder / Venture Capitalist",
+    detail: "PayPal co-founder, Founders Fund. Provided ~$1.7M in early funding to Singularity Institute / MIRI and Yudkowsky — widely credited with making early AI safety research possible. Per 'How Peter Thiel's Relationship With Eliezer Yudkowsky Launched the AI Revolution,' this relationship was catalytic for the field. Thiel's politics diverged from EA/longtermism mainstream; he is more nationalist-libertarian."
+  },
+  {
+    id: "p_macaskill", label: "William MacAskill", type: "person", cluster: "ea", category: "philosopher",
+    tag: "EA Co-founder / Oxford Philosopher",
+    detail: "Oxford philosopher. Co-founded GivingWhatWeCan (2009) and the EA movement. Author of Doing Good Better (2015) and What We Owe the Future (2022), which brought longtermism to mainstream audiences. Introduced Sam Bankman-Fried to EA and the earning-to-give strategy — a connection later scrutinized heavily after FTX's collapse."
+  },
+  {
+    id: "p_ord", label: "Toby Ord", type: "person", cluster: "ea", category: "philosopher",
+    tag: "EA Co-founder / Oxford Philosopher",
+    detail: "Oxford philosopher and Senior Research Fellow at FHI. Co-founded GivingWhatWeCan (2009) and the Centre for Effective Altruism with MacAskill — the institutional origins of the EA movement. GivingWhatWeCan became part of Effective Ventures, the umbrella organization later built out by MacAskill. Author of The Precipice: Existential Risk and the Future of Humanity (2020). Key figure connecting EA ethics to longtermist existential risk concerns."
+  },
+  {
+    id: "p_karnofsky", label: "Holden Karnofsky", type: "person", cluster: "ea_abund", category: "philosopher",
+    tag: "Co-founder / Open Philanthropy & GiveWell",
+    detail: "Co-founded GiveWell (2007) with Elie Haskel, one of the first rigorous charity evaluators and a cornerstone of the EA movement. Later co-founded Open Philanthropy with Dustin Moskovitz and Cari Tuna, where he served as CEO until 2022. Under his leadership Open Philanthropy became the dominant funder of AI safety, global health, and longtermist causes. His blog 'Cold Takes' has been influential in longtermist and AI safety circles. Married to Daniela Amodei, President and co-founder of Anthropic — a personal connection bridging EA's largest funder with one of the leading AI safety labs."
+  },
+  {
+    id: "p_moskovitz", label: "Dustin Moskovitz", type: "person", cluster: "funding", category: "billionaire",
+    tag: "Facebook Co-founder / EA Funder",
+    detail: "Facebook co-founder. With wife Cari Tuna, co-founded Open Philanthropy (~2011). Open Phil is the largest single funder of EA and longtermist causes — hundreds of millions to AI safety (MIRI, FHI, CSER, FLI), global health, and biosecurity. Shifted Open Phil's priorities increasingly toward longtermism and AI safety in the 2020s."
+  },
+  {
+    id: "p_sbf", label: "Sam Bankman-Fried", type: "person", cluster: "ea", category: "billionaire",
+    tag: "FTX Founder (disgraced) / EA Megadonor",
+    detail: "Founded FTX crypto exchange. EA megadonor: FTX Future Fund committed ~$160M to EA/longtermist causes in 2022 (bulk uncommitted after collapse). Introduced to EA by MacAskill and the earning-to-give philosophy. FTX collapsed in November 2022 in what prosecutors called massive fraud. SBF convicted in 2023. Kelsey Piper's interview during the collapse was a key journalistic moment."
+  },
+  {
+    id: "p_musk", label: "Elon Musk", type: "person", cluster: "founders", category: "billionaire",
+    tag: "Tech Billionaire / Funder",
+    detail: "Co-founded OpenAI with Sam Altman (2015) and was an early major donor; left the board in 2018 amid disagreements over control and direction; later sued OpenAI alleging it had abandoned its safety mission. Donated $10M to Future of Life Institute (2015), enabling its AI safety grant program. Co-signed FLI's open letter calling for pause on large AI experiments. Founded xAI (2023). SpaceX's multi-planetary mission reflects longtermist civilizational risk thinking. More recently critical of AI safety mainstream, promoting faster AI development. Leads DOGE (2025), using an 'AI first' strategy to automate government functions and justify federal workforce reductions."
+  },
+  {
+    id: "p_altman", label: "Sam Altman", type: "person", cluster: "founders", category: "billionaire",
+    tag: "OpenAI CEO & Co-founder",
+    detail: "Co-founded OpenAI with Elon Musk and others (2015) and became its CEO. Previously president of Y Combinator. Raised $13B+ from Microsoft and billions more in subsequent rounds, making OpenAI the dominant AI lab. GPT-4 and ChatGPT shifted AI from research curiosity to mass-market product. EA-adjacent in early framing; has since positioned more as a techno-optimist than an AI safety purist. Major AI policy presence in Washington."
+  },
+  {
+    id: "p_piper", label: "Kelsey Piper", type: "person", cluster: "ea_abund", category: "journalist",
+    tag: "Journalist / Vox Future Perfect",
+    detail: "Staff writer at Vox's Future Perfect section, covering EA, longtermism, AI safety, and global health. EA-adjacent perspective. Conducted controversial interview with Sam Bankman-Fried via Signal during the FTX collapse (Nov 2022) — a major journalistic moment. Also writes favorably about Progress Studies, covering the movement's ideas on scientific stagnation, institutional reform, and growth. Bridges EA, Progress Studies, and mainstream journalism."
+  },
+  {
+    id: "p_thompson", label: "Derek Thompson", type: "person", cluster: "abundance", category: "journalist",
+    tag: "Journalist / The Atlantic",
+    detail: "Staff writer at The Atlantic. Co-authored 'Abundance' (2025) with Ezra Klein, naming and defining the Abundance Agenda. Argues for building more housing, energy, and infrastructure as the path through political gridlock. 'The Abundance Gang Has a Big AI Problem' identifies tension between his movement and AI safety concerns."
+  },
+  {
+    id: "p_cowen", label: "Tyler Cowen", type: "person", cluster: "progress", category: "philosopher",
+    tag: "Economist / GMU / Progress Studies",
+    detail: "Economist at George Mason University, Marginal Revolution blog. Runs Emergent Ventures grants at Foundation for American Innovation — funding unconventional thinkers and projects. Co-founded Progress Studies movement with Patrick Collison. Key economic intellectual of the Abundance Agenda. 'Building a Science of Political Progress' reflects his agenda."
+  },
+  {
+    id: "p_klein", label: "Ezra Klein", type: "person", cluster: "ea_abund", category: "journalist",
+    tag: "Journalist / NYT / Vox Co-founder",
+    detail: "Co-founded Vox (2014). NY Times columnist and podcast host. Co-authored 'Abundance' (2025) with Derek Thompson. Has covered both Abundance and AI safety as distinct challenges — see 'Ezra Klein on the Abundance Agenda (Ep. 236).' Vox's Future Perfect section (Kelsey Piper) is EA-adjacent, showing the tension/overlap within his media empire."
+  },
+  {
+    id: "p_postrel", label: "Virginia Postrel", type: "person", cluster: "abundance", category: "journalist",
+    tag: "Libertarian Journalist / Author",
+    detail: "Libertarian journalist and author. Former editor of Reason magazine. Author of 'The Future and Its Enemies' (1998), which framed political conflict as 'dynamism vs. stasis' — a key intellectual precursor to the Abundance Agenda. 'Virginia Postrel: Dynamism or Stasis?' places her as the ideological grandmother of Abundance thinking. Less connected to EA/longtermism."
+  },
+  {
+    id: "p_ball", label: "Dean Ball", type: "person", cluster: "policy", category: "philosopher",
+    tag: "Policy Researcher / AI Governance",
+    detail: "Researcher at Niskanen Center focused on AI governance and technology policy. Author of America's AI Action Plan, a blueprint for U.S. AI policy emphasizing speed, deregulation, and maintaining American leadership in AI development. Connected to Abundance thinking through a shared pro-build, anti-regulatory-bottleneck orientation. Part of the broader evidence-based tech policy community that overlaps with but is distinct from EA longtermism."
+  },
+
+  // ORGANIZATIONS
+  {
+    id: "o_extropy", label: "Extropy Institute", type: "org", cluster: "transhumanism", category: "think_tank",
+    tag: "Transhumanist Org (dissolved 2006)",
+    detail: "Founded ~1988 by Max More and Tom Bell. Published Extropy magazine. Key early hub for ideas about cryonics, life extension, AI, and technology-driven human enhancement. Influential on Silicon Valley tech culture and early internet communities. Dissolved 2006. Predecessor to modern transhumanism; the TESCREAL Bundle traces Extropianism as a root ideology."
+  },
+  {
+    id: "o_wta", label: "World Transhumanist Assoc.", type: "org", cluster: "transhumanism", category: "think_tank",
+    tag: "Transhumanist Org (now Humanity+)",
+    detail: "Co-founded by Nick Bostrom and David Pearce (1998). Later renamed Humanity+. International organization promoting transhumanist philosophy — human enhancement through technology. Academic credibility bridge between transhumanism and mainstream philosophy. Influenced by and overlapping with Extropy Institute. Part of the TESCREAL ideological bundle."
+  },
+  {
+    id: "o_miri", label: "Machine Intelligence\nResearch Institute", type: "org", cluster: "rationalism", category: "research_center",
+    tag: "AI Safety Research (formerly Singularity Institute)",
+    detail: "Machine Intelligence Research Institute. Founded by Yudkowsky as Singularity Institute for Artificial Intelligence (2000); renamed MIRI (2013). Focuses on technical AI alignment (mathematical proofs of AI safety). Funded by Peter Thiel (early ~$1.7M), Open Philanthropy (major ongoing funder), and individual EA donors. Key institution in the rationalist → AI safety pipeline."
+  },
+  {
+    id: "o_fhi", label: "Future of Humanity Institute", type: "org", cluster: "longtermism", category: "research_center",
+    tag: "Oxford Research Institute (closed 2024)",
+    detail: "Founded by Nick Bostrom at Oxford (2005). Longtermism and existential risk research hub. Home to Bostrom, Toby Ord, William MacAskill, and many collaborators. Produced foundational research on AI safety, bio-risk, and existential risk. Funded by Open Philanthropy and others. Closed in April 2024 amid institutional and funding pressures — a significant moment for the longtermist ecosystem."
+  },
+  {
+    id: "o_gwwc", label: "Effective Ventures", type: "org", cluster: "ea", category: "charity",
+    tag: "EA Umbrella Organization",
+    detail: "Umbrella organization for the EA movement, rebranded as Effective Ventures Foundation in 2022. Built out by William MacAskill from the Centre for Effective Altruism (CEA), which he and Toby Ord co-founded. Houses GivingWhatWeCan (the 10% pledge, also co-founded by MacAskill and Ord), 80,000 Hours, EA Funds, and other EA infrastructure. Funded by Open Philanthropy and received funding from FTX Future Fund before its collapse."
+  },
+  {
+    id: "o_openphil", label: "Open Philanthropy", type: "org", cluster: "ea_abund", category: "charity",
+    tag: "EA Foundation / Major Funder",
+    detail: "Co-founded by Dustin Moskovitz and Cari Tuna (~2011). The largest EA/longtermist funder, having disbursed hundreds of millions. Key grantees include MIRI, FHI, CSER, FLI, pandemic preparedness, global health, and animal welfare. Increasingly prioritized AI safety and longtermism. Effectively the financial backbone of the institutional EA/longtermism ecosystem after FTX's collapse. Sponsored the 2025 Abundance Conference (co-hosted by Niskanen Center and FAS) — a striking signal that EA/longtermist money is actively flowing into Abundance Agenda institutions despite the stated tension between the two movements on AI regulation."
+  },
+  {
+    id: "o_ftx", label: "FTX Future Fund", type: "org", cluster: "ea", category: "charity",
+    tag: "EA Grantmaking Fund (collapsed Nov 2022)",
+    detail: "FTX Future Fund (2022) was the EA/longtermist grantmaking arm of SBF's FTX crypto exchange. Committed ~$160M to EA/longtermist organizations — CSER, FLI, Effective Ventures, and dozens of others — before collapse. Was briefly the second-largest EA funder after Open Philanthropy. Jaan Tallinn gave FTX a $110M personal loan, which was repaid before the collapse. Collapse in Nov 2022 caused funding crises across the EA ecosystem and reputational damage to the movement. SBF convicted of fraud in 2023."
+  },
+  {
+    id: "o_cser", label: "Centre for Study of\nExistential Risk", type: "org", cluster: "longtermism", category: "research_center",
+    tag: "Cambridge Research Institute",
+    detail: "Based at Cambridge University. Co-founded by Jaan Tallinn, philosopher Huw Price, and astronomer Martin Rees (2012). Researches extreme technological risks: AI, biotech, climate, nuclear. Funded by Open Philanthropy, FTX Future Fund (before collapse), and Jaan Tallinn personally. Less dominated by EA orthodoxy than FHI; more pluralistic institutional culture."
+  },
+  {
+    id: "o_fli", label: "Future of Life Institute", type: "org", cluster: "ea_abund", category: "charity",
+    tag: "AI Safety / Existential Risk Org",
+    detail: "Co-founded by Max Tegmark, Jaan Tallinn, Viktoriya Krakovna, and others (2014). Focus: AI safety, nuclear risk, biotech risk. Elon Musk donated $10M in 2015, enabling early AI safety grant program that funded dozens of researchers. Published influential open letters on AI risk (2015, 2023). Funded by Open Philanthropy and FTX Future Fund. Key bridge between tech billionaires and AI safety research. Sponsored the 2025 Abundance Conference (co-hosted by Niskanen Center and FAS) alongside Open Philanthropy — a core x-risk/longtermist org actively investing in the Abundance Agenda's flagship event."
+  },
+  {
+    id: "o_openai", label: "OpenAI", type: "org", cluster: "corporate", category: "research_center",
+    tag: "AI Lab (Altman & Musk, 2015)",
+    detail: "Co-founded by Sam Altman, Elon Musk, and others in 2015 as a non-profit AI safety lab. Received early funding from Open Philanthropy ($30M, 2017). Transitioned to a 'capped-profit' structure and accepted a $13B+ investment from Microsoft. GPT-4 and ChatGPT made OpenAI the dominant AI lab globally. Several co-founders — including Dario and Daniela Amodei — left to found Anthropic over concerns about safety culture. Ilya Sutskever later left to found Safe Superintelligence (SSI)."
+  },
+  {
+    id: "o_anthropic", label: "Anthropic", type: "org", cluster: "corporate", category: "research_center",
+    tag: "AI Safety Lab (Dario & Daniela Amodei)",
+    detail: "AI safety company co-founded in 2021 by Dario Amodei (CEO) and Daniela Amodei (President), along with several colleagues who left OpenAI. Mission-driven focus on AI safety research, including Constitutional AI and interpretability. Received major investment from Google and Amazon. Daniela Amodei's marriage to Holden Karnofsky (Open Philanthropy co-founder) represents a significant personal bridge between EA's dominant funder and one of the leading AI safety labs. Amanda Askell, a philosopher and key figure in EA-adjacent intellectual circles, works at Anthropic on model alignment and character."
+  },
+  {
+    id: "p_d_amodei", label: "Daniela Amodei", type: "person", cluster: "aisafety", category: "billionaire",
+    tag: "Anthropic President & Co-founder",
+    detail: "President and co-founder of Anthropic (2021). Previously VP of Operations at OpenAI. Leads business, operations, and policy at Anthropic alongside her brother Dario Amodei (CEO). Married to Holden Karnofsky, co-founder of Open Philanthropy — a personal relationship that connects Anthropic directly to the EA movement's largest funder. Anthropic has received significant investment from Google and Amazon."
+  },
+  {
+    id: "p_askell", label: "Amanda Askell", type: "person", cluster: "ea", category: "philosopher",
+    tag: "Philosopher / Anthropic Alignment",
+    detail: "Philosopher and AI alignment researcher at Anthropic. Works on model character, values, and alignment — including Constitutional AI. Previously a researcher in EA-adjacent philosophical circles, connected to William MacAskill through shared intellectual and personal networks. Her work at Anthropic bridges analytic philosophy with practical AI alignment, reflecting the EA movement's pipeline of philosopher-researchers into AI safety labs."
+  },
+  {
+    id: "o_deepmind", label: "DeepMind", type: "org", cluster: "longtermism", category: "research_center",
+    tag: "AI Research Lab (acquired by Google 2014)",
+    detail: "AI lab founded by Demis Hassabis, Shane Legg, and Mustafa Suleyman (2010). Early funding from Peter Thiel's Founders Fund and Horizons Ventures (Li Ka-shing) before Google acquired it for ~£400M (~$650M) in 2014. Co-founder Shane Legg expressed long-standing AI risk concerns predating EA. Has an internal AI safety team. Connected to broader AI safety discourse through personnel; several MIRI/FHI-adjacent researchers have worked there. Thiel's early investment links the same rationalist-adjacent funder who seeded MIRI to the mainstream AI lab ecosystem."
+  },
+  {
+    id: "o_vox", label: "Vox / Future Perfect", type: "org", cluster: "ea", category: "journalist",
+    tag: "Media Organization",
+    detail: "Vox founded by Ezra Klein (2014). Future Perfect is its EA-adjacent section covering longtermism, AI safety, animal welfare, and evidence-based giving. Kelsey Piper is the key writer. Serves as the main mainstream media bridge to the EA/longtermist community. The existence of Future Perfect within Vox reflects Klein's dual engagement with Abundance Agenda and EA-adjacent ideas."
+  },
+  {
+    id: "o_niskanen", label: "Niskanen Center", type: "org", cluster: "policy", category: "think_tank",
+    tag: "Centrist Think Tank",
+    detail: "Center-right / centrist think tank focused on climate, immigration, technology. Dean Ball does AI governance research there. Co-hosted the 2025 Abundance Conference alongside the Federation of American Scientists, with Future of Life Institute and Open Philanthropy as sponsors — placing Niskanen at the center of the institutional convergence between the EA/longtermism and Abundance Agenda communities."
+  },
+  {
+    id: "o_mercatus", label: "Mercatus Center\nGrants", type: "org", cluster: "progress", category: "research_center",
+    tag: "George Mason University Research Center (Tyler Cowen)",
+    detail: "The Mercatus Center at George Mason University, founded by Tyler Cowen. A market-oriented research center that produces academic and policy research on economics, regulation, and governance. Home to Emergent Ventures, Cowen's grant program for unconventional thinkers. Funded by the Koch network and other libertarian foundations. Key intellectual infrastructure for Progress Studies and the Abundance Agenda."
+  },
+  {
+    id: "o_emergent_ventures", label: "Emergent Ventures", type: "org", cluster: "progress", category: "charity",
+    tag: "Grant Program (Tyler Cowen / Mercatus Center)",
+    detail: "Grant program run by Tyler Cowen, housed at the Mercatus Center at George Mason University. Awards small, fast grants to unconventional researchers, entrepreneurs, and intellectuals. Funded by Peter Thiel, Charles Koch, and the Mercatus Center. Has become a key talent pipeline and intellectual incubator for the Progress Studies and Abundance Agenda communities — several Institute for Progress founders came through Emergent Ventures."
+  },
+  {
+    id: "o_ifp", label: "Institute for\nProgress", type: "org", cluster: "progress", category: "think_tank",
+    tag: "Think Tank / Science & Innovation Policy",
+    detail: "Think tank focused on accelerating scientific progress, reforming research institutions (NIH, NSF), and modernizing immigration policy for high-skilled talent. Founded by alumni of Emergent Ventures. Funded by Emergent Ventures, FTX Future Fund (before collapse), Open Philanthropy, and Eric Schmidt's Renaissance Philanthropy. Co-hosted the Abundance Conferences alongside the Foundation for American Innovation, positioning IFP at the center of the institutional Abundance Agenda ecosystem."
+  },
+  {
+    id: "o_fai", label: "Foundation for\nAmerican Innovation", type: "org", cluster: "abundance", category: "think_tank",
+    tag: "Think Tank / Progress Studies",
+    detail: "Formerly Lincoln Network. Technology and innovation policy think tank. Tyler Cowen runs the Emergent Ventures grant program there — funding unconventional researchers and entrepreneurs. Promotes innovation-friendly regulation and progress studies. Connected to Abundance Agenda's intellectual infrastructure."
+  },
+  {
+    id: "o_fas", label: "Federation of\nAmerican Scientists", type: "org", cluster: "policy", category: "think_tank",
+    tag: "Science Policy Organization",
+    detail: "Founded 1945 by Manhattan Project scientists for nuclear arms control. In recent years has worked on AI governance, science talent policy, and biosecurity. Co-hosted the 2025 Abundance Conference alongside Niskanen Center, with Future of Life Institute and Open Philanthropy as sponsors — placing FAS at the nexus of the Abundance Agenda and EA/x-risk funding networks."
+  },
+  {
+    id: "o_aei", label: "American Enterprise\nInstitute", type: "org", cluster: "policy", category: "think_tank",
+    tag: "Conservative Think Tank",
+    detail: "American Enterprise Institute — one of the oldest and most influential conservative/right-leaning think tanks in Washington. Promotes free markets, limited government, and American enterprise. Charles Murray is a long-time fellow. AEI's pro-market, pro-innovation orientation overlaps with parts of the Abundance Agenda and Progress Studies, though it sits further right. Funded significantly by conservative foundations including Koch-affiliated donors."
+  },
+  {
+    id: "p_murray", label: "Charles Murray", type: "person", cluster: "policy", category: "philosopher",
+    tag: "Political Scientist / AEI Fellow",
+    detail: "Political scientist and long-time fellow at the American Enterprise Institute. Best known for The Bell Curve (1994, with Richard Herrnstein), which argued that intelligence — partially heritable — is a strong predictor of life outcomes, and controversially examined racial differences in measured IQ. The book was widely condemned as providing intellectual cover for eugenicist policy but became a touchstone in rationalist and transhumanist circles, where discussions of intelligence, genetics, and cognitive enhancement are common. His work on intelligence research connects him to the TESCREAL cluster through the shared preoccupation with heritable cognitive traits. Also wrote Losing Ground (1984) on welfare policy and Coming Apart (2012) on class stratification."
+  },
+  {
+    id: "o_abundance2025", label: "Abundance\nConferences", type: "org", cluster: "policy", category: "event",
+    tag: "Annual Policy Conference",
+    detail: "Annual Abundance Conference series (2024–2025). Co-hosted by the Niskanen Center and the Federation of American Scientists. Sponsors across the two years include Renaissance Philanthropy (Eric Schmidt), Open Philanthropy, Future of Life Institute, and Chamber of Progress. Represents the flagship institutional event of the Abundance Agenda — and a striking convergence of EA/longtermist funding with progress-oriented policy infrastructure."
+  },
+  {
+    id: "p_arnold", label: "John D. Arnold", type: "person", cluster: "funding", category: "billionaire",
+    tag: "Billionaire / Arnold Ventures / Meta Board",
+    detail: "Hedge fund billionaire and co-founder of Arnold Ventures with wife Laura Arnold. Former energy trader at Enron who became one of the most successful commodity traders before retiring at 38. Now a major evidence-based philanthropist focused on policy reform across criminal justice, healthcare, and public finance. Board member of Meta. Arnold Ventures has expanded into tech policy and the Abundance Agenda, sponsoring the Abundance Conferences and funding the Niskanen Center."
+  },
+  {
+    id: "o_arnold_ventures", label: "Arnold Ventures", type: "org", cluster: "funding", category: "charity",
+    tag: "Philanthropy (John D. Arnold)",
+    detail: "Philanthropic organization co-founded by John D. Arnold and Laura Arnold. Focuses on evidence-based policy reform across criminal justice, healthcare, education, and public finance. Has expanded into tech policy and the Abundance Agenda, sponsoring the Abundance Conferences and funding the Niskanen Center. Arnold's Meta board seat connects the organization to Big Tech interests."
+  },
+  {
+    id: "p_koch", label: "Charles Koch", type: "person", cluster: "policy", category: "billionaire",
+    tag: "Billionaire / Koch Industries / Stand Together",
+    detail: "Chairman and CEO of Koch Industries, one of the largest private companies in the U.S. Long-time funder of libertarian and free-market causes through a vast network of think tanks, advocacy groups, and foundations — the 'Kochtopus.' Co-founded Stand Together (originally called Seminar Network) with his late brother David Koch. Funds the Foundation for American Innovation, Stand Together Trust, and Emergent Ventures, channeling significant capital into Abundance-adjacent policy infrastructure."
+  },
+  {
+    id: "o_stand_together", label: "Stand Together\nTrust", type: "org", cluster: "policy", category: "charity",
+    tag: "Koch Network Philanthropy",
+    detail: "Philanthropic arm of Charles Koch's Stand Together network (formerly known as the Seminar Network / Koch network). Funds a wide range of libertarian and market-oriented causes including criminal justice reform, education, and increasingly tech policy and innovation. Sponsored the Abundance Conferences and funds the Niskanen Center, reflecting Koch network money flowing into mainstream center-to-libertarian policy spaces."
+  },
+  {
+    id: "o_microsoft", label: "Microsoft", type: "org", cluster: "corporate", category: "tech_company",
+    tag: "Tech Corporation / OpenAI Funder",
+    detail: "Invested $13B+ in OpenAI across multiple rounds from 2019 onwards, becoming OpenAI's exclusive cloud partner and integrating GPT models across its product suite (Copilot, Azure OpenAI Service). Microsoft's bet on OpenAI is the defining corporate AI partnership of the current era, transforming both companies. Major AI policy presence in Washington."
+  },
+  {
+    id: "o_amazon", label: "Amazon", type: "org", cluster: "corporate", category: "tech_company",
+    tag: "Tech Corporation / Anthropic Funder",
+    detail: "Invested $4B+ in Anthropic, making it Anthropic's largest single investor and exclusive cloud partner (AWS). Also funds the Chamber of Progress, channeling corporate money into tech industry advocacy. Amazon's investment in Anthropic mirrors Microsoft's OpenAI bet — both companies are racing to embed leading AI labs within their cloud infrastructure."
+  },
+  {
+    id: "o_google", label: "Google", type: "org", cluster: "corporate", category: "tech_company",
+    tag: "Tech Corporation / Funder",
+    detail: "Alphabet subsidiary and one of the world's largest technology companies. Funds tech industry advocacy organizations including the Chamber of Progress and the Niskanen Center, channeling corporate money into policy spaces that advance lighter AI regulation and innovation-friendly governance — aligned with Google's business interests in the Abundance Agenda policy environment."
+  },
+  {
+    id: "p_schmidt", label: "Eric Schmidt", type: "person", cluster: "funding", category: "billionaire",
+    tag: "Google CEO (former) / Philanthropist",
+    detail: "Co-founder and longtime CEO of Google. After leaving Google, became a major tech philanthropist through Schmidt Futures. Funder of Renaissance Philanthropy, which supports science, progress, and policy-oriented giving. Connected to the Abundance Agenda's intellectual infrastructure through philanthropy that backs progress-oriented research and institutions."
+  },
+  {
+    id: "o_renaissance", label: "Renaissance\nPhilanthropy", type: "org", cluster: "funding", category: "charity",
+    tag: "Science & Progress Philanthropy",
+    detail: "Philanthropic organization focused on accelerating scientific progress, supporting emerging technologies, and funding policy-oriented research. Funded by Eric Schmidt. Sponsored the Abundance Conferences, placing it at the nexus of tech-philanthropist money and the Abundance Agenda's institutional ecosystem."
+  },
+  {
+    id: "o_doge", label: "White House", type: "org", cluster: "policy", category: "government",
+    tag: "Executive Branch / AI & Tech Policy",
+    detail: "The Trump White House (2025–) has pursued an aggressive 'AI first' governing strategy. DOGE (Department of Government Efficiency), led by Elon Musk, deploys AI to audit spending, automate government functions, and justify federal workforce reductions. Dean Ball's America's AI Action Plan serves as a policy blueprint: emphasizing speed, deregulation, and U.S. AI leadership over safety guardrails. The administration's approach reflects the Abundance Agenda's anti-bureaucracy instincts taken to an extreme — using AI to dismantle the administrative state rather than just reduce regulatory bottlenecks. Critics warn this concentrates power in private hands with no congressional oversight."
+  },
+  {
+    id: "p_andreessen", label: "Marc Andreessen", type: "person", cluster: "abundance", category: "billionaire",
+    tag: "VC / Techno-Optimist",
+    detail: "Co-founder of Netscape; general partner at Andreessen Horowitz (a16z), one of the most influential VC firms in Silicon Valley. Author of 'It's Time to Build' (April 2020), a foundational Abundance Agenda text arguing that America's failure to build — hospitals, housing, factories, education — reflects a crisis of political will rather than capability. Author of 'The Techno-Optimist Manifesto' (2023), a maximalist pro-technology, pro-growth, anti-regulation document aligned with Progress Studies and Abundance thinking. Connected to the rationalist community through shared tech-optimist networks and PayPal Mafia-adjacent ties."
+  },
+  {
+    id: "o_a16z", label: "Andreessen Horowitz\n(a16z)", type: "org", cluster: "abundance", category: "vc_firm",
+    tag: "VC Firm (Marc Andreessen)",
+    detail: "Andreessen Horowitz (a16z), co-founded by Marc Andreessen and Ben Horowitz (2009). One of Silicon Valley's most influential venture capital firms. Its 'American Dynamism' practice backs companies that strengthen national competitiveness — defense tech (Anduril), manufacturing, housing, government tech — making it the investment-world expression of the Abundance Agenda. a16z has funded the Chamber of Progress, channeling VC money into tech industry advocacy. Andreessen's 'It's Time to Build' (2020) and 'The Techno-Optimist Manifesto' (2023) are foundational texts for the firm's worldview."
+  },
+  {
+    id: "o_founders_fund", label: "Founders Fund", type: "org", cluster: "rationalism", category: "vc_firm",
+    tag: "Venture Capital Firm (Peter Thiel)",
+    detail: "Venture capital firm founded by Peter Thiel (2005), with partners including Ken Howery and Luke Nosek. Early investor in SpaceX, Palantir, Facebook, DeepMind, and Airbnb. The fund reflects Thiel's contrarian, techno-pessimist-about-everything-except-software philosophy. Its backing of SpaceX connects to longtermist multi-planetary thinking; its early investment in DeepMind links Thiel's rationalist-adjacent network to mainstream AI research. Also funded MIRI through Thiel's personal giving."
+  },
+  {
+    id: "o_cop", label: "Chamber of Progress", type: "org", cluster: "abundance", category: "think_tank",
+    tag: "Tech Industry Advocacy (industry-funded)",
+    detail: "Tech industry advocacy group founded by Adam Kovacevich. Funded by Google, Amazon, Apple, Meta. Uses progressive framing to advance tech industry interests including reduced content moderation liability and lighter AI regulation. Aligns with Abundance Agenda on reducing regulatory barriers. Critics note its corporate funding creates conflicts with its progressive messaging."
+  },
+];
+
+// ─── Links (person↔person, person↔org, org↔org only) ─────────────────────────
+const links = [
+  // Org lineage
+  { source: "o_extropy", target: "o_wta", type: "ideological_influence", label: "Extropy Institute and WTA shared membership and philosophy; WTA formalized transhumanism academically" },
+
+  // People → Organizations (founding)
+  { source: "p_yudkowsky",  target: "o_miri",      type: "founded",   label: "Founded Singularity Institute for AI (2000), later renamed MIRI (2013)" },
+  { source: "p_bostrom",    target: "o_fhi",       type: "founded",   label: "Founded Future of Humanity Institute at Oxford (2005)" },
+  { source: "p_bostrom",    target: "o_wta",       type: "founded",   label: "Co-founded World Transhumanist Association with David Pearce (1998)" },
+  { source: "p_macaskill",  target: "o_gwwc",      type: "founded",   label: "Founded Effective Ventures (originally Centre for Effective Altruism) out of his Oxford work; the umbrella org for GivingWhatWeCan, 80,000 Hours, and EA infrastructure" },
+  { source: "p_ord",        target: "o_gwwc",      type: "founded",   label: "Co-founded GivingWhatWeCan (2009) and the Centre for Effective Altruism with MacAskill — both became part of the Effective Ventures umbrella, though Effective Ventures itself was built out by MacAskill" },
+  { source: "p_tallinn",    target: "o_cser",      type: "founded_funded", label: "Co-founded Centre for Study of Existential Risk at Cambridge (2012) with Huw Price and Martin Rees, and provided major personal funding to establish it" },
+  { source: "p_tallinn",    target: "o_fli",       type: "founded_funded", label: "Co-founded Future of Life Institute (2014) with Max Tegmark and others, and has been a major funder of its AI safety work" },
+  { source: "p_moskovitz",  target: "o_openphil",  type: "founded_funded", label: "Co-founded Open Philanthropy with wife Cari Tuna (~2011) and is its primary funder — Moskovitz's Facebook fortune is the financial engine behind hundreds of millions in EA/longtermist grantmaking" },
+  { source: "p_karnofsky",  target: "o_openphil",  type: "founded_funded", label: "Co-founded Open Philanthropy with Dustin Moskovitz and Cari Tuna; served as CEO until 2022. Previously co-founded GiveWell (2007), one of EA's foundational charity evaluators." },
+  { source: "p_sbf",        target: "o_ftx",       type: "founded_funded", label: "Founded and bankrolled FTX crypto exchange; FTX Future Fund was the EA/longtermist funding vehicle through which SBF deployed hundreds of millions before the collapse" },
+  { source: "p_klein",      target: "o_vox",       type: "founded",   label: "Co-founded Vox (2014)" },
+
+  // People → Organizations (funding)
+  { source: "p_thiel",      target: "o_miri",      type: "funded",    label: "Provided ~$1.7M in early funding to Singularity Institute / MIRI — catalytic for AI safety field. See: 'How Peter Thiel's Relationship With Eliezer Yudkowsky Launched the AI Revolution'" },
+  { source: "p_musk",       target: "o_fli",       type: "funded",    label: "Donated $10M to Future of Life Institute (2015), enabling AI safety grant program" },
+
+  // People → Organizations (works at)
+  { source: "p_macaskill",  target: "o_fhi",       type: "works_at",  label: "Researcher at FHI, Oxford" },
+  { source: "p_ord",        target: "o_fhi",       type: "works_at",  label: "Senior Research Fellow at FHI, Oxford" },
+  { source: "p_piper",      target: "o_vox",       type: "works_at",  label: "Writes Future Perfect section; EA-adjacent AI/longtermism coverage" },
+  { source: "p_piper",      target: "p_cowen",     type: "associated", label: "Piper has written about Progress Studies and is sympathetic to the movement's ideas on scientific stagnation, institutional reform, and the importance of economic growth" },
+  { source: "p_ball",       target: "o_niskanen",  type: "works_at",  label: "AI governance researcher at Niskanen Center" },
+  { source: "p_cowen",      target: "o_fai",       type: "associated", label: "Runs Emergent Ventures grant program at Foundation for American Innovation" },
+  { source: "p_ball",       target: "o_fas",       type: "associated", label: "Connected to FAS through AI governance and science policy work" },
+  { source: "p_ball",       target: "o_fai",       type: "associated", label: "Senior Fellow at the Foundation for American Innovation, where he works on AI governance and technology policy" },
+  { source: "p_musk",       target: "o_doge",      type: "works_at",   label: "Leads DOGE (Dept. of Government Efficiency) inside the Trump White House, created by executive order Jan 2025. 'AI first' strategy: deploy AI to audit spending, automate government functions, and justify federal workforce reductions" },
+  { source: "p_ball",       target: "o_doge",      type: "works_at",   label: "Dean Ball's America's AI Action Plan serves as a key policy blueprint for the White House's AI governance approach — emphasizing speed, deregulation, and U.S. AI leadership over safety constraints" },
+  { source: "p_postrel",    target: "o_aei",       type: "associated", label: "Has written articles for and appeared on podcasts hosted by the American Enterprise Institute" },
+  { source: "p_postrel",    target: "o_niskanen",  type: "associated", label: "Has written articles for and appeared on podcasts hosted by the Niskanen Center" },
+  { source: "p_murray",     target: "o_aei",       type: "works_at",   label: "Long-time fellow at AEI; The Bell Curve and his broader body of work on intelligence, welfare, and class were produced under AEI's umbrella" },
+  { source: "p_thiel",      target: "o_founders_fund",  type: "founded_funded", label: "Founded Founders Fund (2005) and is its managing partner and primary LP; early backer of SpaceX, Palantir, Facebook, DeepMind — fund reflects Thiel's contrarian tech philosophy" },
+  { source: "o_founders_fund", target: "o_deepmind",    type: "funded",     label: "Founders Fund was an early investor in DeepMind before Google's ~£400M acquisition (2014)" },
+  { source: "p_andreessen", target: "o_a16z",             type: "founded_funded",        label: "Co-founded Andreessen Horowitz (a16z) with Ben Horowitz (2009) and remains its general partner; the firm is the primary vehicle for Andreessen's tech investment and ideological agenda" },
+  { source: "o_a16z",       target: "o_cop",              type: "funded",                label: "Andreessen Horowitz (a16z) has funded the Chamber of Progress, channeling VC money into tech industry advocacy that advances lighter AI regulation and reduced content moderation liability — aligned with a16z's anti-regulatory stance" },
+  { source: "p_andreessen", target: "p_cowen",           type: "ideological_influence", label: "'It's Time to Build' (2020) and 'The Techno-Optimist Manifesto' (2023) are foundational texts aligned with Cowen's Progress Studies agenda; Andreessen and Cowen share the same pro-build, pro-growth intellectual project" },
+  { source: "p_murray",     target: "o_wta",       type: "ideological_influence", label: "The Bell Curve's framing of heritable intelligence as a determinant of societal outcomes became a recurring reference in rationalist and transhumanist communities, which share a preoccupation with cognitive enhancement, genetics, and the long-run trajectory of human intelligence. The TESCREAL Bundle critique traces this lineage explicitly." },
+
+  // Org → Org (funding flows)
+  { source: "o_openphil",  target: "o_miri",   type: "funded", label: "Open Philanthropy is a major ongoing funder of MIRI's AI alignment research" },
+  { source: "o_openphil",  target: "o_fhi",    type: "funded", label: "Open Philanthropy funded FHI research at Oxford" },
+  { source: "o_openphil",  target: "o_cser",   type: "funded", label: "Open Philanthropy funded CSER at Cambridge" },
+  { source: "o_openphil",  target: "o_fli",    type: "funded", label: "Open Philanthropy funded Future of Life Institute" },
+  { source: "o_ftx",       target: "o_cser",   type: "funded", label: "FTX Future Fund funded CSER before collapse" },
+  { source: "o_ftx",       target: "o_fli",    type: "funded", label: "FTX Future Fund funded Future of Life Institute" },
+  { source: "o_ftx",       target: "o_gwwc",      type: "funded",     label: "FTX Future Fund funded Effective Ventures before collapse" },
+  { source: "o_openphil",  target: "o_gwwc",      type: "funded",     label: "Open Philanthropy is a major funder of Effective Ventures, supporting GivingWhatWeCan, 80,000 Hours, and other EA infrastructure projects" },
+
+  // Cross-movement personal connections
+  { source: "p_macaskill", target: "p_sbf",    type: "personal_relationship",  label: "MacAskill introduced SBF to EA and earning-to-give philosophy; mentored him into EA megadonor role. Later scrutinized after FTX collapse." },
+  { source: "p_tallinn",   target: "o_openphil", type: "associated", label: "Coordinates with Open Philanthropy on AI safety funding priorities" },
+  { source: "p_tallinn",   target: "o_ftx",      type: "funded",     label: "$110M personal loan to FTX — repaid before the exchange collapsed in Nov 2022" },
+
+  // Abundance Conferences (2024–2025)
+  { source: "p_schmidt",      target: "o_renaissance",   type: "funded",     label: "Eric Schmidt funds Renaissance Philanthropy, which supports science, progress, and policy-oriented giving aligned with the Abundance Agenda" },
+  { source: "o_renaissance",  target: "o_abundance2025", type: "funded",     label: "Renaissance Philanthropy (Eric Schmidt) sponsored the Abundance Conference" },
+  { source: "o_openphil",     target: "o_abundance2025", type: "funded",     label: "Open Philanthropy sponsored the Abundance Conferences (2024 and 2025) — EA's largest funder channeling money into Abundance Agenda infrastructure" },
+  { source: "o_fli",          target: "o_abundance2025", type: "funded",     label: "Future of Life Institute sponsored the 2025 Abundance Conference — a core x-risk/longtermist org funding the Abundance Agenda's flagship event" },
+  { source: "o_niskanen",     target: "o_abundance2025", type: "associated", label: "Co-hosts the annual Abundance Conference alongside the Federation of American Scientists" },
+  { source: "o_fas",          target: "o_abundance2025", type: "associated", label: "Co-hosts the annual Abundance Conference alongside the Niskanen Center" },
+  { source: "o_cop",          target: "o_abundance2025", type: "funded",     label: "Chamber of Progress sponsored the 2025 Abundance Conference" },
+
+  // John Arnold & Arnold Ventures
+  { source: "p_arnold",          target: "o_arnold_ventures", type: "founded_funded", label: "Co-founded Arnold Ventures with wife Laura Arnold and is its primary funder through his hedge fund fortune" },
+  { source: "o_arnold_ventures", target: "o_abundance2025",   type: "funded",         label: "Arnold Ventures sponsored the Abundance Conferences" },
+  { source: "o_arnold_ventures", target: "o_niskanen",        type: "funded",         label: "Arnold Ventures funds the Niskanen Center" },
+
+  // Charles Koch, Stand Together, & Koch network flows
+  { source: "p_koch",            target: "o_stand_together",  type: "founded_funded", label: "Co-founded Stand Together (formerly Seminar Network) with his late brother David Koch; primary funder of the Koch philanthropic network" },
+  { source: "o_stand_together",  target: "o_abundance2025",   type: "funded",         label: "Stand Together Trust (Koch network) sponsored the Abundance Conferences" },
+  { source: "o_stand_together",  target: "o_niskanen",        type: "funded",         label: "Stand Together Trust (Koch network) funds the Niskanen Center" },
+  { source: "p_koch",            target: "o_fai",             type: "funded",         label: "Charles Koch funds the Foundation for American Innovation" },
+  { source: "p_koch",            target: "o_emergent_ventures", type: "funded",       label: "Charles Koch funds Emergent Ventures through his philanthropic network" },
+
+  // Google
+  { source: "o_google",          target: "o_niskanen",        type: "funded",         label: "Google funds the Niskanen Center" },
+  { source: "o_google",          target: "o_cop",             type: "funded",         label: "Google funds the Chamber of Progress, channeling Big Tech corporate money into advocacy that advances lighter AI regulation and reduced content moderation liability" },
+
+  // OpenAI
+  { source: "p_altman",      target: "o_openai",     type: "founded_funded", label: "Co-founded OpenAI with Elon Musk and others (2015); has served as CEO since founding, steering it from non-profit AI safety lab to dominant commercial AI company" },
+  { source: "p_musk",        target: "o_openai",     type: "founded_funded", label: "Co-founded OpenAI with Sam Altman (2015) and was an early major donor; left the board in 2018 amid disagreements over control and direction. Later sued OpenAI alleging it had abandoned its safety mission." },
+  { source: "o_microsoft",   target: "o_openai",     type: "funded",         label: "Invested $13B+ in OpenAI across multiple rounds from 2019 onwards; exclusive cloud partner (Azure); integrated GPT across Copilot, Office, and Azure products" },
+  { source: "o_openphil",    target: "o_openai",     type: "funded",         label: "Open Philanthropy donated $30M to OpenAI in 2017, one of its earliest major grants — an early signal of EA-aligned capital flowing into frontier AI labs" },
+
+  // Microsoft, Amazon, Google → AI labs
+  { source: "o_amazon",      target: "o_anthropic",  type: "funded",         label: "Invested $4B+ in Anthropic; exclusive cloud partner (AWS); Amazon's bet on Anthropic mirrors Microsoft's OpenAI investment — both racing to embed AI labs within their cloud infrastructure" },
+  { source: "o_amazon",      target: "o_cop",        type: "funded",         label: "Amazon funds the Chamber of Progress, channeling Big Tech corporate money into advocacy advancing lighter AI regulation and reduced content moderation liability" },
+  { source: "o_google",      target: "o_anthropic",  type: "funded",         label: "Invested $2B+ in Anthropic; also a cloud partner (Google Cloud). Google is simultaneously Anthropic's investor and its competitor via DeepMind/Gemini." },
+  { source: "o_google",      target: "o_deepmind",   type: "funded",         label: "Acquired DeepMind for ~£400M (~$650M) in 2014; DeepMind is now a core part of Alphabet/Google, developing the Gemini model family" },
+
+  // Anthropic
+  { source: "p_d_amodei",   target: "o_anthropic",  type: "founded",               label: "Co-founded Anthropic (2021) with her brother Dario Amodei and colleagues who left OpenAI; serves as President overseeing business, operations, and policy" },
+  { source: "p_d_amodei",   target: "p_karnofsky",  type: "personal_relationship", label: "Daniela Amodei and Holden Karnofsky are married — a personal connection bridging Anthropic directly to Open Philanthropy, the EA movement's dominant funder" },
+  { source: "p_askell",     target: "o_anthropic",  type: "works_at",              label: "Philosopher and AI alignment researcher at Anthropic working on model character, values, and Constitutional AI" },
+  { source: "p_askell",     target: "p_macaskill",  type: "personal_relationship", label: "Amanda Askell and William MacAskill share close intellectual and personal ties through overlapping EA-adjacent philosophical networks; Askell's trajectory from philosophy into AI alignment at Anthropic mirrors the EA pipeline" },
+  { source: "p_askell",     target: "o_gwwc",       type: "associated",            label: "Amanda Askell is a member of Giving What We Can, the EA pledge organisation housed within Effective Ventures" },
+
+  // Mercatus Center & Emergent Ventures
+  { source: "p_cowen",           target: "o_mercatus",        type: "founded",        label: "Founded the Mercatus Center at George Mason University, which houses the Emergent Ventures grant program" },
+  { source: "o_mercatus",        target: "o_emergent_ventures", type: "funded",       label: "Mercatus Center Grants funds Emergent Ventures" },
+  { source: "p_thiel",           target: "o_emergent_ventures", type: "funded",       label: "Peter Thiel is a major funder of Emergent Ventures" },
+
+  // Institute for Progress
+  { source: "o_emergent_ventures", target: "o_ifp",           type: "funded",         label: "Emergent Ventures funded Institute for Progress; IFP founders came through the Emergent Ventures talent pipeline" },
+  { source: "o_ftx",             target: "o_ifp",             type: "funded",         label: "FTX Future Fund funded Institute for Progress before the exchange's collapse in November 2022" },
+  { source: "o_openphil",        target: "o_ifp",             type: "funded",         label: "Open Philanthropy funds Institute for Progress" },
+  { source: "o_renaissance",     target: "o_ifp",             type: "funded",         label: "Renaissance Philanthropy (Eric Schmidt) funds Institute for Progress" },
+  { source: "p_schmidt",         target: "o_ifp",             type: "funded",         label: "Eric Schmidt directly funded Institute for Progress" },
+  { source: "o_ifp",             target: "o_abundance2025",   type: "associated",     label: "Institute for Progress co-hosted the Abundance Conferences alongside the Foundation for American Innovation" },
+  { source: "o_fai",             target: "o_abundance2025",   type: "associated",     label: "Foundation for American Innovation co-hosted the Abundance Conferences alongside the Institute for Progress" },
+];
+
+// ─── D3 Setup ──────────────────────────────────────────────────────────────────
+const svg = d3.select("#container")
+  .append("svg")
+  .attr("width", W)
+  .attr("height", H);
+
+// ─── Selection state ──────────────────────────────────────────────────────────
+let activeNode = null;
+let activeCategory = null;
+let nodeDragged = false;
+
+function clearSelection() {
+  activeNode = null;
+  activeCategory = null;
+  document.querySelectorAll(".leg-item[data-category]").forEach(el => el.classList.remove("leg-active"));
+  nodeEl && nodeEl.classed("dimmed", false);
+  linkEl && linkEl.classed("dimmed", false).attr("stroke-opacity", 0.5).attr("opacity", null);
+}
+
+function applyHighlight() {
+  if (activeNode !== null) {
+    const connectedNodeIds = new Set([activeNode.id]);
+    const connectedLinks = new Set();
+    links.forEach(l => {
+      const sid = l.source.id ?? l.source;
+      const tid = l.target.id ?? l.target;
+      if (sid === activeNode.id || tid === activeNode.id) {
+        connectedNodeIds.add(sid);
+        connectedNodeIds.add(tid);
+        connectedLinks.add(l);
+      }
+    });
+    nodeEl.classed("dimmed", d => !connectedNodeIds.has(d.id));
+    linkEl.classed("dimmed", d => !connectedLinks.has(d));
+    linkEl.filter(d => connectedLinks.has(d)).attr("stroke-opacity", 0.9);
+  } else if (activeCategory !== null) {
+    nodeEl.classed("dimmed", d => d.category !== activeCategory);
+    linkEl.classed("dimmed", d => {
+      const sid = d.source.id ?? d.source;
+      const tid = d.target.id ?? d.target;
+      const sNode = nodes.find(n => n.id === sid);
+      const tNode = nodes.find(n => n.id === tid);
+      return sNode?.category !== activeCategory && tNode?.category !== activeCategory;
+    });
+  }
+}
+
+// Zoom / pan
+const zoom = d3.zoom()
+  .scaleExtent([0.3, 3])
+  .on("zoom", (event) => {
+    g.attr("transform", event.transform);
+  });
+svg.call(zoom);
+
+// Main group
+const g = svg.append("g");
+
+// Arrow markers
+const markerTypes = [
+  { id: "arr-founded",        color: "#10b981" },
+  { id: "arr-funded",         color: "#f97316" },
+  { id: "arr-founded_funded", color: "#f59e0b" },
+  { id: "arr-works_at",   color: "#60a5fa" },
+  { id: "arr-personal_relationship",   color: "#f472b6" },
+  { id: "arr-associated", color: "#475569" },
+  { id: "arr-ideological_influence", color: "#7c3aed" },
+  { id: "arr-ideological_tension",   color: "#ef4444" },
+  { id: "arr-flow",                  color: "#7c3aed" },
+];
+
+const defs = svg.append("defs");
+markerTypes.forEach(m => {
+  defs.append("marker")
+    .attr("id", m.id)
+    .attr("viewBox", "0 -4 8 8")
+    .attr("refX", 8)
+    .attr("refY", 0)
+    .attr("markerWidth", 6)
+    .attr("markerHeight", 6)
+    .attr("orient", "auto")
+    .append("path")
+    .attr("d", "M0,-4L8,0L0,4")
+    .attr("fill", m.color)
+    .attr("opacity", 0.7);
+});
+
+// Glow filter
+const filter = defs.append("filter").attr("id", "glow");
+filter.append("feGaussianBlur").attr("stdDeviation", "3").attr("result", "coloredBlur");
+const feMerge = filter.append("feMerge");
+feMerge.append("feMergeNode").attr("in", "coloredBlur");
+feMerge.append("feMergeNode").attr("in", "SourceGraphic");
+
+const linkStyleMap = {
+  ideological_influence: { color: "#7c3aed", dash: "6,3",  width: 1.5 },
+  founded:               { color: "#10b981", dash: null,   width: 1.5 },
+  funded:                { color: "#f97316", dash: null,   width: 1.5 },
+  founded_funded:        { color: "#f59e0b", dash: null,   width: 1.5 },
+  works_at:              { color: "#60a5fa", dash: null,   width: 1.5 },
+  associated:            { color: "#475569", dash: "3,2",  width: 1.5 },
+  personal_relationship: { color: "#f472b6", dash: null,   width: 1.5 },
+  ideological_tension:   { color: "#ef4444", dash: "5,3",  width: 1.5 },
+};
+
+// ─── Force Simulation ─────────────────────────────────────────────────────────
+// Initialize node positions near cluster center
+nodes.forEach(n => {
+  const c = cp[n.cluster] || { x: W/2, y: H/2 };
+  const scatter = n.cluster === "corporate" ? 30 : 120;
+  n.x = c.x + (Math.random() - 0.5) * scatter;
+  n.y = c.y + (Math.random() - 0.5) * scatter;
+});
+
+const simulation = d3.forceSimulation(nodes)
+  .force("link", d3.forceLink(links).id(d => d.id).distance(d => {
+    if (d.type === "funded") return 120;
+    if (d.type === "founded") return 95;
+    if (d.type === "ideological_influence") return 130;
+    if (d.type === "ideological_tension") return 150;
+    return 100;
+  }).strength(0.3))
+  .force("charge", d3.forceManyBody().strength(-550))
+  .force("x", d3.forceX(d => cp[d.cluster].x).strength(0.18))
+  .force("y", d3.forceY(d => cp[d.cluster].y).strength(0.18))
+  .force("collide", d3.forceCollide(d => nodeR(d) + 38))
+  .alphaDecay(0.02);
+
+// ─── Draw Links ───────────────────────────────────────────────────────────────
+const linkEl = g.append("g").attr("class", "links")
+  .selectAll("line")
+  .data(links)
+  .join("line")
+  .attr("class", "link")
+  .attr("stroke", d => (linkStyleMap[d.type] || {}).color || "#475569")
+  .attr("stroke-width", d => (linkStyleMap[d.type] || {}).width || 1)
+  .attr("stroke-dasharray", d => (linkStyleMap[d.type] || {}).dash || null)
+  .attr("stroke-opacity", 0.5)
+  .attr("marker-end", d => `url(#arr-${d.type})`)
+  .style("cursor", "pointer")
+  .on("mouseenter", function(event, d) {
+    if (!d3.select(this).classed("dimmed")) {
+      d3.select(this).attr("stroke-opacity", 1);
+      showTooltip(event, `<h3>${getLabel(d.source)} → ${getLabel(d.target)}</h3><span class="tag">${d.type.replace(/_/g,' ')}</span><p>${d.label}</p>`);
+    }
+  })
+  .on("mousemove", moveTooltip)
+  .on("mouseleave", function(event, d) {
+    if (!d3.select(this).classed("dimmed")) {
+      d3.select(this).attr("stroke-opacity", 0.5);
+    }
+    hideTooltip();
+  });
+
+function getLabel(nodeOrId) {
+  if (typeof nodeOrId === "string") {
+    const n = nodes.find(x => x.id === nodeOrId);
+    return n ? n.label.replace(/\n/g, " ") : nodeOrId;
+  }
+  return (nodeOrId.label || "").replace(/\n/g, " ");
+}
+
+// ─── Draw Nodes ───────────────────────────────────────────────────────────────
+const nodeEl = g.append("g").attr("class", "nodes")
+  .selectAll("g")
+  .data(nodes)
+  .join("g")
+  .attr("class", "node")
+  .call(d3.drag()
+    .on("start", (event, d) => {
+      nodeDragged = false;
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      d.fx = d.x; d.fy = d.y;
+      hideTooltip();
+    })
+    .on("drag", (event, d) => { nodeDragged = true; d.fx = event.x; d.fy = event.y; })
+    .on("end", (event, d) => {
+      if (!event.active) simulation.alphaTarget(0);
+      // keep d.fx / d.fy set so the node stays where it was dropped
+    })
+  )
+  .on("mouseenter", function(event, d) {
+    d3.select(this).select("circle").attr("filter", "url(#glow)");
+    showTooltip(event, `<h3>${d.label.replace(/\n/g," ")}</h3><span class="tag">${d.tag}</span><p>${d.detail}</p>`);
+  })
+  .on("mousemove", moveTooltip)
+  .on("mouseleave", function() {
+    d3.select(this).select("circle").attr("filter", null);
+    hideTooltip();
+  })
+  .on("click", function(event, d) {
+    if (nodeDragged) return;
+    event.stopPropagation();
+    if (activeNode === d) {
+      clearSelection();
+    } else {
+      activeNode = d;
+      activeCategory = null;
+      document.querySelectorAll(".leg-item[data-category]").forEach(el => el.classList.remove("leg-active"));
+      applyHighlight();
+    }
+  });
+
+// Background glow
+nodeEl.append("circle")
+  .attr("r", d => nodeR(d) * 1.8)
+  .attr("fill", d => categoryColor[d.category] || "#475569")
+  .attr("opacity", 0.12);
+
+// Main circle
+nodeEl.append("circle")
+  .attr("class", "node-circle")
+  .attr("r", d => nodeR(d))
+  .attr("fill", d => categoryColor[d.category] || "#475569")
+  .attr("fill-opacity", d => d.type === "person" ? 0.7 : 0.5)
+  .attr("stroke", d => categoryColor[d.category] || "#475569")
+  .attr("stroke-opacity", 0.9)
+  .attr("stroke-width", 1.5);
+
+// Labels
+nodeEl.append("text")
+  .attr("class", d => `node-label ${d.type}`)
+  .attr("text-anchor", "middle")
+  .each(function(d) {
+    const lines = d.label.split("\n");
+    const el = d3.select(this);
+    const r = nodeR(d);
+    const offset = r + 10;
+    if (lines.length === 1) {
+      el.attr("y", offset)
+        .attr("dominant-baseline", "hanging")
+        .text(d.label);
+    } else {
+      lines.forEach((line, i) => {
+        el.append("tspan")
+          .attr("x", 0)
+          .attr("y", offset + i * 11)
+          .attr("dominant-baseline", "hanging")
+          .text(line);
+      });
+    }
+  });
+
+// ─── Simulation tick ──────────────────────────────────────────────────────────
+simulation.on("tick", () => {
+  linkEl
+    .attr("x1", d => d.source.x)
+    .attr("y1", d => d.source.y)
+    .attr("x2", d => {
+      const dx = d.target.x - d.source.x;
+      const dy = d.target.y - d.source.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      return d.target.x - (dx / dist) * (nodeR(d.target) + 6);
+    })
+    .attr("y2", d => {
+      const dx = d.target.x - d.source.x;
+      const dy = d.target.y - d.source.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      return d.target.y - (dy / dist) * (nodeR(d.target) + 6);
+    });
+
+  nodeEl.attr("transform", d => `translate(${d.x},${d.y})`);
+
+  // Recompute each ideology circle to tightly enclose its nodes
+  const clusterNodeMap = {};
+  nodes.forEach(n => {
+    if (!clusterNodeMap[n.cluster]) clusterNodeMap[n.cluster] = [];
+    clusterNodeMap[n.cluster].push(n);
+  });
+
+  ideologyClusters.forEach(c => {
+    // Abundance circle encloses policy nodes; longtermism and abundance enclose founders nodes; ea and abundance enclose ea_abund nodes
+    const extra    = clusterNodeMap["founders"]  || [];
+    const eaAbund  = clusterNodeMap["ea_abund"]  || [];
+    const cNodes = c.key === "abundance"
+      ? [...(clusterNodeMap["abundance"] || []), ...(clusterNodeMap["policy"] || []), ...extra, ...eaAbund]
+      : c.key === "longtermism"
+        ? [...(clusterNodeMap["longtermism"] || []), ...extra]
+        : c.key === "ea"
+          ? [...(clusterNodeMap["ea"] || []), ...eaAbund]
+          : (clusterNodeMap[c.key] || []);
+    const cx = cNodes.length ? d3.mean(cNodes, n => n.x) : cp[c.key].x;
+    const cy = cNodes.length ? d3.mean(cNodes, n => n.y) : cp[c.key].y;
+    const r  = cNodes.length
+      ? Math.max(70, d3.max(cNodes, n => Math.sqrt((n.x - cx) ** 2 + (n.y - cy) ** 2) + nodeR(n) + 32))
+      : 70;
+    circleEls[c.key].circle.attr("cx", cx).attr("cy", cy).attr("r", r);
+    circleEls[c.key].label.attr("x", cx).attr("y", cy - r - 9);
+    circleEls[c.key].cx = cx;
+    circleEls[c.key].cy = cy;
+    circleEls[c.key].r  = r;
+  });
+
+  // Redraw flow arrows — hide if the two circles intersect or one contains the other
+  flowArrowEls
+    .attr("d", d => {
+      const fr = circleEls[d.from], to = circleEls[d.to];
+      const dx = to.cx - fr.cx, dy = to.cy - fr.cy;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const sx = fr.cx + (dx / dist) * fr.r;
+      const sy = fr.cy + (dy / dist) * fr.r;
+      const ex = to.cx - (dx / dist) * (to.r + 10);
+      const ey = to.cy - (dy / dist) * (to.r + 10);
+      const mx = (sx + ex) / 2 - (dy / dist) * 28;
+      const my = (sy + ey) / 2 + (dx / dist) * 28;
+      return `M${sx},${sy} Q${mx},${my} ${ex},${ey}`;
+    })
+    .attr("stroke-opacity", d => {
+      const fr = circleEls[d.from], to = circleEls[d.to];
+      const dist = Math.sqrt((to.cx - fr.cx) ** 2 + (to.cy - fr.cy) ** 2);
+      return dist < fr.r + to.r ? 0 : 0.5;
+    })
+    .attr("marker-end", d => {
+      const fr = circleEls[d.from], to = circleEls[d.to];
+      const dist = Math.sqrt((to.cx - fr.cx) ** 2 + (to.cy - fr.cy) ** 2);
+      return dist < fr.r + to.r ? null : "url(#arr-flow)";
+    })
+    .attr("pointer-events", d => {
+      const fr = circleEls[d.from], to = circleEls[d.to];
+      const dist = Math.sqrt((to.cx - fr.cx) ** 2 + (to.cy - fr.cy) ** 2);
+      return dist < fr.r + to.r ? "none" : "auto";
+    });
+});
+
+// ─── Ideological movement circles ─────────────────────────────────────────────
+const ideologyClusters = [
+  { key: "transhumanism", name: "Transhumanism & Extropianism" },
+  { key: "rationalism",   name: "Rationalism"                  },
+  { key: "ea",            name: "Effective Altruism"           },
+  { key: "longtermism",   name: "Longtermism"                  },
+  { key: "progress",      name: "Progress Studies"             },
+  { key: "abundance",     name: "Abundance Agenda"             },
+];
+
+const movementFlow = [
+  { from: "transhumanism", to: "rationalism", label: "Transhumanism influenced early Rationalism: shared focus on AI, singularity, and human enhancement. The Extropy Institute and early LessWrong community had significant membership overlap." },
+  { from: "rationalism",   to: "ea",          label: "EA adopted Bayesian/rationalist epistemics; large overlap between LessWrong and EA communities. Rationalism provided the epistemic framework EA used to evaluate cause areas." },
+  { from: "ea",            to: "longtermism",  label: "Longtermism emerged within EA as a dominant 'cause area'; MacAskill & Ord moved EA toward existential risk, culminating in What We Owe the Future (2022) and The Precipice (2020)." },
+  { from: "longtermism",   to: "progress",    label: "Longtermism's pro-growth imperative feeds Progress Studies. As Adam Becker argues in 'More Everything Forever,' longtermists require a phenomenal level of growth — in population, economic productivity, energy usage, and natural resources — to realize their vision. MacAskill holds continuous growth imperative until humanity has the technology to prevent its own extinction." },
+  { from: "progress",      to: "abundance",   label: "Progress Studies provides the intellectual scaffolding for the Abundance Agenda: if Abundance prescribes what to build (housing, energy, infrastructure), Progress Studies supplies the historical and empirical case for why growth stalled and how institutions can restart it." },
+];
+
+function idName(key) { return ideologyClusters.find(c => c.key === key)?.name || key; }
+
+// Circle group inserted behind everything else
+const circleGroup = g.insert("g", ":first-child").attr("class", "ideology-circles");
+
+// Flow-arrow group inserted just above circles, below links+nodes
+const flowGroup = g.insert("g", ".links").attr("class", "flow-arrows");
+
+// Build one circle + label element per ideology cluster
+const circleEls = {};
+ideologyClusters.forEach(c => {
+  const color = clusterColor[c.key];
+  const grp = circleGroup.append("g");
+  circleEls[c.key] = {
+    circle: grp.append("circle")
+      .attr("fill", color)
+      .attr("fill-opacity", 0.04)
+      .attr("stroke", color)
+      .attr("stroke-width", 2)
+      .attr("stroke-opacity", 0.45)
+      .attr("stroke-dasharray", "7,4")
+      .style("pointer-events", "none"),
+    label: grp.append("text")
+      .attr("text-anchor", "middle")
+      .attr("fill", color)
+      .attr("font-size", "12px")
+      .attr("font-weight", "700")
+      .attr("letter-spacing", "0.07em")
+      .attr("opacity", 0.75)
+      .style("pointer-events", "none")
+      .text(c.name),
+    cx: cp[c.key].x, cy: cp[c.key].y, r: 80,
+  };
+});
+
+// Build flow arrows between circle edges
+const flowArrowEls = flowGroup.selectAll("path")
+  .data(movementFlow)
+  .join("path")
+  .attr("fill", "none")
+  .attr("stroke", "#7c3aed")
+  .attr("stroke-width", 2)
+  .attr("stroke-opacity", 0.5)
+  .attr("stroke-dasharray", "8,4")
+  .attr("marker-end", "url(#arr-flow)")
+  .style("cursor", "pointer")
+  .on("mouseenter", function(event, d) {
+    d3.select(this).attr("stroke-opacity", 1).attr("stroke-width", 2.5);
+    showTooltip(event, `<h3>${idName(d.from)} → ${idName(d.to)}</h3><span class="tag">ideological influence</span><p>${d.label}</p>`);
+  })
+  .on("mousemove", moveTooltip)
+  .on("mouseleave", function() {
+    d3.select(this).attr("stroke-opacity", 0.5).attr("stroke-width", 2);
+    hideTooltip();
+  });
+
+// ─── Tooltip helpers ──────────────────────────────────────────────────────────
+const tip = document.getElementById("tooltip");
+
+function showTooltip(event, html) {
+  tip.innerHTML = html;
+  tip.style.display = "block";
+  moveTooltip(event);
+}
+function moveTooltip(event) {
+  const x = event.clientX + 14;
+  const y = event.clientY - 10;
+  const tw = tip.offsetWidth;
+  const th = tip.offsetHeight;
+  tip.style.left = (x + tw > window.innerWidth - 10 ? x - tw - 28 : x) + "px";
+  tip.style.top  = (y + th > window.innerHeight - 10 ? y - th + 10 : y) + "px";
+}
+function hideTooltip() { tip.style.display = "none"; }
+
+// ─── Background click clears selection ────────────────────────────────────────
+svg.on("click", () => clearSelection());
+
+// ─── Legend category filter clicks ────────────────────────────────────────────
+document.querySelectorAll(".leg-item[data-category]").forEach(el => {
+  el.addEventListener("click", () => {
+    const cat = el.dataset.category;
+    if (activeCategory === cat) {
+      clearSelection();
+    } else {
+      activeNode = null;
+      activeCategory = cat;
+      document.querySelectorAll(".leg-item[data-category]").forEach(e => e.classList.remove("leg-active"));
+      el.classList.add("leg-active");
+      applyHighlight();
+    }
+  });
+});
+</script>
+</body>
+</html>
